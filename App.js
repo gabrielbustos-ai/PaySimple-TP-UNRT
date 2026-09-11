@@ -28,7 +28,7 @@ function Header({ title, onBack }) {
   return (
     <View style={styles.header}>
       <TouchableOpacity style={styles.iconButton} onPress={onBack} activeOpacity={0.7}>
-        <Feather name="chevron-left" size={26} color="#000" />
+        <Feather name="chevron-left" size={26} color="#F2F4EF" />
       </TouchableOpacity>
       <Text style={styles.subtitle}>{title}</Text>
       <View style={styles.iconButton} />
@@ -42,6 +42,13 @@ function ContactosFrecuentesScreen({ navigation }) {
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <Header title="Transferir" onBack={() => navigation.goBack()} />
 
+      <View style={styles.contactosHeader}>
+        <Text style={styles.contactosTitulo}>Contactos frecuentes</Text>
+        <Text style={styles.contactosDescripcion}>
+          Elegí a quién querés transferir dinero
+        </Text>
+      </View>
+
       <FlatList
         data={CONTACTOS}
         keyExtractor={(item) => item.id}
@@ -49,9 +56,32 @@ function ContactosFrecuentesScreen({ navigation }) {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.contactCard}
-            onPress={() => navigation.navigate('PerfilDestinatario', { contacto: item })}>
-            <Text style={styles.contactName}>{item.name}</Text>
-            <Text style={styles.contactSub}>{item.alias} · {item.banco}</Text>
+            activeOpacity={0.8}
+            onPress={() =>
+              navigation.navigate('PerfilDestinatario', { contacto: item })
+            }
+          >
+            <View style={styles.contactAvatar}>
+              <Text style={styles.contactAvatarText}>
+                {item.name.charAt(0)}
+              </Text>
+            </View>
+
+            <View style={styles.contactInfo}>
+              <Text style={styles.contactName}>{item.name}</Text>
+              <Text style={styles.contactSub}>
+                {item.alias}
+              </Text>
+              <Text style={styles.contactBank}>
+                {item.banco}
+              </Text>
+            </View>
+
+            <Feather
+              name="chevron-right"
+              size={21}
+              color="#999"
+            />
           </TouchableOpacity>
         )}
       />
@@ -204,144 +234,233 @@ export default function App() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#f2f2f2',
+    backgroundColor: '#111411',
   },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f2f2f2',
+    backgroundColor: '#111411',
     paddingTop: 10,
     paddingBottom: 14,
     paddingHorizontal: 8,
   },
+
   subtitle: {
-    color: '#000',
+    color: '#F2F4EF',
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
   },
+
   iconButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
+
+  /* CONTACTOS FRECUENTES */
+
+  contactosHeader: {
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 18,
+  },
+
+  contactosTitulo: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#F2F4EF',
+  },
+
+  contactosDescripcion: {
+    fontSize: 14,
+    color: '#A3A8A1',
+    marginTop: 5,
+  },
+
   list: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 20,
   },
+
   contactCard: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 8,
+    backgroundColor: '#1A1E1A',
+    borderRadius: 16,
+    padding: 15,
+    marginBottom: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#292E29',
   },
+
+  contactAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#B8F23D',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 13,
+  },
+
+  contactAvatarText: {
+    color: '#111411',
+    fontSize: 19,
+    fontWeight: '700',
+  },
+
+  contactInfo: {
+    flex: 1,
+  },
+
   contactName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#000',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#F2F4EF',
   },
+
   contactSub: {
     fontSize: 13,
-    color: '#777',
-    marginTop: 2,
+    color: '#B8BDB6',
+    marginTop: 4,
   },
+
+  contactBank: {
+    fontSize: 12,
+    color: '#7F857E',
+    marginTop: 3,
+  },
+
+  /* PERFIL DEL DESTINATARIO */
+
   perfilContainer: {
     alignItems: 'center',
     padding: 20,
   },
+
   avatar: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#0057ff',
+    backgroundColor: '#B8F23D',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 10,
   },
+
   avatarText: {
-    color: '#fff',
+    color: '#111411',
     fontSize: 28,
     fontWeight: '700',
   },
+
   perfilNombre: {
     fontSize: 18,
     fontWeight: '700',
+    color: '#F2F4EF',
     marginTop: 12,
     marginBottom: 20,
   },
+
   datosBancarios: {
     width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    backgroundColor: '#1A1E1A',
+    borderRadius: 14,
     padding: 16,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#292E29',
   },
+
   datoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#292E29',
   },
+
   datoLabel: {
-    color: '#777',
+    color: '#8F958E',
     fontSize: 14,
   },
+
   datoValor: {
-    color: '#000',
+    color: '#F2F4EF',
     fontSize: 14,
     fontWeight: '600',
   },
+
+  /* BOTÓN PRINCIPAL */
+
   botonPrimario: {
-    backgroundColor: '#0057ff',
-    borderRadius: 10,
+    backgroundColor: '#B8F23D',
+    borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 24,
     width: '100%',
     alignItems: 'center',
   },
+
   botonPrimarioTexto: {
-    color: '#fff',
+    color: '#111411',
     fontSize: 15,
     fontWeight: '700',
   },
+
+  /* FORMULARIO DE TRANSFERENCIA */
+
   formContainer: {
     padding: 20,
   },
+
   saldoBox: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    backgroundColor: '#1A1E1A',
+    borderRadius: 14,
     padding: 16,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#292E29',
   },
+
   saldoLabel: {
-    color: '#777',
+    color: '#8F958E',
     fontSize: 13,
   },
+
   saldoValor: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#000',
+    color: '#F2F4EF',
     marginTop: 4,
   },
+
   destinatarioTexto: {
     fontSize: 14,
-    color: '#333',
+    color: '#B8BDB6',
     marginBottom: 16,
   },
+
   inputLabel: {
     fontSize: 13,
-    color: '#555',
+    color: '#A3A8A1',
     marginBottom: 6,
     marginTop: 10,
   },
+
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    backgroundColor: '#1A1E1A',
+    borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
+    color: '#F2F4EF',
     marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#292E29',
   },
 });
