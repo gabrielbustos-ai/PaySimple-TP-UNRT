@@ -1,4 +1,4 @@
-import { useState, useContext, createContext } from 'react';
+import { useState, useContext, createContext, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,62 +7,34 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Feather } from '@expo/vector-icons';
 
-const CONTACTOS = [
-  {
-    id: '1',
-    name: 'Juan Pérez',
-    alias: 'juan.perez.mp',
-    cbu: '0000003100012345678901',
-    banco: 'Mercado Pago',
-  },
-  {
-    id: '2',
-    name: 'María López',
-    alias: 'maria.lopez',
-    cbu: '0000003100098765432109',
-    banco: 'Banco Galicia',
-  },
-  {
-    id: '4',
-    name: 'Carlos Gómez',
-    alias: 'carlos.g',
-    cbu: '0000003100055551234567',
-    banco: 'Banco Santander',
-  },
-];
+import { CUENTAS_VALIDAS } from './data/cuentasValidas';
+import { guardarContactoEnNube, obtenerContactos } from './firebaseConfig';
 
 const SALDO_INICIAL = 50000;
-
 const Stack = createStackNavigator();
-
 const SaldoContext = createContext();
 
 function SaldoProvider({ children }) {
   const [saldo, setSaldo] = useState(SALDO_INICIAL);
-
-  const descontarSaldo = (monto) => {
-    setSaldo((saldoActual) => saldoActual - monto);
-  };
-
+  const descontarSaldo = (monto) => setSaldo((s) => s - monto);
   return (
     <SaldoContext.Provider value={{ saldo, descontarSaldo }}>
       {children}
     </SaldoContext.Provider>
   );
 }
-
 function useSaldo() {
   return useContext(SaldoContext);
 }
 
-// Header reutilizable para no repetir código en cada pantalla
 function Header({ title, onBack }) {
   return (
     <View style={styles.header}>
@@ -78,11 +50,84 @@ function Header({ title, onBack }) {
   );
 }
 
+// Busca en el "sistema bancario" simulado por CBU exacto o alias (sin importar mayúsculas)
+function buscarCuentaValida(query) {
+  const texto = query.trim();
+  if (!texto) return null;
+  const textoLower = texto.toLowerCase();
+  return (
+    CUENTAS_VALIDAS.find(
+      (cuenta) =>
+        cuenta.cbu === texto || cuenta.alias.toLowerCase() === textoLower
+    ) || null
+  );
+}
+
 // ---------- PANTALLA 1: Contactos frecuentes ----------
 function ContactosFrecuentesScreen({ navigation }) {
+  const [busqueda, setBusqueda] = useState('');
+  const [contactos, setContactos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  const cargarContactos = useCallback(async () => {
+    setCargando(true);
+    try {
+      const lista = await obtenerContactos();
+      setContactos(lista);
+    } catch (error) {
+      Alert.alert(
+        'Error',
+        'No se pudieron cargar los contactos: ' + error.message
+      );
+    } finally {
+      setCargando(false);
+    }
+  }, []);
+
+  // Se re-ejecuta cada vez que esta pantalla vuelve a estar visible
+  // (por ejemplo, al volver después de agregar un contacto nuevo)
+  useFocusEffect(
+    useCallback(() => {
+      cargarContactos();
+    }, [cargarContactos])
+  );
+
+  const handleBuscar = () => {
+    const cuenta = buscarCuentaValida(busqueda);
+
+    if (!cuenta) {
+      Alert.alert(
+        'No encontrada',
+        'No existe ninguna cuenta con ese CBU o alias.'
+      );
+      return;
+    }
+
+    setBusqueda('');
+    navigation.navigate('PerfilDestinatario', {
+      contacto: cuenta,
+      esNuevo: true,
+    });
+  };
+
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <Header title="Transferir" onBack={() => navigation.goBack()} />
+
+      <View style={styles.buscadorContainer}>
+        <TextInput
+          style={styles.buscadorInput}
+          placeholder="Ingresá CBU o alias"
+          placeholderTextColor="#8F958E"
+          value={busqueda}
+          onChangeText={setBusqueda}
+          autoCapitalize="none"
+          onSubmitEditing={handleBuscar}
+        />
+        <TouchableOpacity style={styles.buscadorBoton} onPress={handleBuscar}>
+          <Feather name="search" size={20} color="#111411" />
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.contactosHeader}>
         <Text style={styles.contactosTitulo}>Contactos frecuentes</Text>
@@ -91,40 +136,66 @@ function ContactosFrecuentesScreen({ navigation }) {
         </Text>
       </View>
 
-      <FlatList
-        data={CONTACTOS}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.contactCard}
-            activeOpacity={0.8}
-            onPress={() =>
-              navigation.navigate('PerfilDestinatario', { contacto: item })
-            }>
-            <View style={styles.contactAvatar}>
-              <Text style={styles.contactAvatarText}>
-                {item.name.charAt(0)}
-              </Text>
-            </View>
-
-            <View style={styles.contactInfo}>
-              <Text style={styles.contactName}>{item.name}</Text>
-              <Text style={styles.contactSub}>{item.alias}</Text>
-              <Text style={styles.contactBank}>{item.banco}</Text>
-            </View>
-
-            <Feather name="chevron-right" size={21} color="#999" />
-          </TouchableOpacity>
-        )}
-      />
+      {cargando ? (
+        <ActivityIndicator color="#B8F23D" style={{ marginTop: 20 }} />
+      ) : (
+        <FlatList
+          data={contactos}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <Text style={styles.contactosDescripcion}>
+              Todavía no tenés contactos guardados. Buscá un CBU o alias para
+              agregar uno.
+            </Text>
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.contactCard}
+              activeOpacity={0.8}
+              onPress={() =>
+                navigation.navigate('PerfilDestinatario', {
+                  contacto: item,
+                  esNuevo: false,
+                })
+              }>
+              <View style={styles.contactAvatar}>
+                <Text style={styles.contactAvatarText}>
+                  {item.name.charAt(0)}
+                </Text>
+              </View>
+              <View style={styles.contactInfo}>
+                <Text style={styles.contactName}>{item.name}</Text>
+                <Text style={styles.contactSub}>{item.alias}</Text>
+                <Text style={styles.contactBank}>{item.banco}</Text>
+              </View>
+              <Feather name="chevron-right" size={21} color="#999" />
+            </TouchableOpacity>
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
 // ---------- PANTALLA 2: Perfil del destinatario ----------
 function PerfilDestinatarioScreen({ route, navigation }) {
-  const { contacto } = route.params;
+  const { contacto, esNuevo } = route.params;
+  const [guardando, setGuardando] = useState(false);
+  const [yaAgregado, setYaAgregado] = useState(!esNuevo);
+
+  const handleAgregarContacto = async () => {
+    setGuardando(true);
+    try {
+      await guardarContactoEnNube(contacto);
+      setYaAgregado(true);
+      Alert.alert('Listo', `${contacto.name} se agregó a tus contactos.`);
+    } catch (error) {
+      Alert.alert('Error', error.message);
+    } finally {
+      setGuardando(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
@@ -155,6 +226,25 @@ function PerfilDestinatarioScreen({ route, navigation }) {
           </View>
         </View>
 
+        {!yaAgregado && (
+          <TouchableOpacity
+            style={[
+              styles.botonPrimario,
+              {
+                backgroundColor: '#1A1E1A',
+                borderWidth: 1,
+                borderColor: '#292E29',
+                marginBottom: 10,
+              },
+            ]}
+            onPress={handleAgregarContacto}
+            disabled={guardando}>
+            <Text style={[styles.botonPrimarioTexto, { color: '#F2F4EF' }]}>
+              {guardando ? 'Agregando...' : 'Agregar a mis contactos'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={styles.botonPrimario}
           onPress={() =>
@@ -167,7 +257,7 @@ function PerfilDestinatarioScreen({ route, navigation }) {
   );
 }
 
-// ---------- PANTALLA 3: Formulario de transferencia ----------
+// ---------- PANTALLA 3: Formulario de transferencia (sin cambios) ----------
 function FormularioTransferenciaScreen({ route, navigation }) {
   const { contacto } = route.params;
   const { saldo, descontarSaldo } = useSaldo();
@@ -180,7 +270,6 @@ function FormularioTransferenciaScreen({ route, navigation }) {
   const confirmarTransferencia = () => {
     const montoNumerico = parseFloat(monto.replace(',', '.'));
 
-    // Validación 1: monto no numérico o <= 0
     if (isNaN(montoNumerico) || montoNumerico <= 0) {
       Alert.alert(
         'Monto inválido',
@@ -188,25 +277,21 @@ function FormularioTransferenciaScreen({ route, navigation }) {
       );
       return;
     }
-
-    // Validación 2: saldo insuficiente
     if (montoNumerico > saldo) {
       Alert.alert('Error', 'Saldo insuficiente para realizar esta transacción');
       return;
     }
 
-    // Transferencia OK: descontamos saldo y mostramos comprobante
     descontarSaldo(montoNumerico);
     const nuevoSaldo = saldo - montoNumerico;
 
     Alert.alert(
       'Transferencia exitosa',
-      `Comprobante virtual\n\n` +
-        `Destinatario: ${contacto.name}\n` +
-        `CBU/Alias: ${contacto.alias}\n` +
-        `Monto: ${formatearMoneda(montoNumerico)}\n` +
-        `Concepto: ${motivo || 'Varios'}\n` +
-        `Saldo restante: ${formatearMoneda(nuevoSaldo)}`,
+      `Comprobante virtual\n\nDestinatario: ${contacto.name}\nCBU/Alias: ${
+        contacto.alias
+      }\nMonto: ${formatearMoneda(montoNumerico)}\nConcepto: ${
+        motivo || 'Varios'
+      }\nSaldo restante: ${formatearMoneda(nuevoSaldo)}`,
       [
         {
           text: 'Aceptar',
@@ -219,7 +304,6 @@ function FormularioTransferenciaScreen({ route, navigation }) {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
       <Header title="Transferir dinero" onBack={() => navigation.goBack()} />
-
       <View style={styles.formContainer}>
         <View style={styles.saldoBox}>
           <Text style={styles.saldoLabel}>Saldo disponible</Text>
@@ -260,7 +344,7 @@ function FormularioTransferenciaScreen({ route, navigation }) {
   );
 }
 
-// ---------- NAVEGACIÓN RAÍZ ----------
+// ---------- NAVEGACIÓN RAÍZ (sin cambios) ----------
 export default function App() {
   return (
     <SafeAreaProvider>
@@ -473,7 +557,7 @@ const styles = StyleSheet.create({
   /* FORMULARIO DE TRANSFERENCIA */
 
   formContainer: {
-    padding: 20
+    padding: 20,
   },
 
   saldoBox: {
@@ -520,5 +604,29 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     borderWidth: 1,
     borderColor: '#292E29',
+  },
+  buscadorContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginBottom: 6,
+    gap: 8,
+  },
+  buscadorInput: {
+    flex: 1,
+    backgroundColor: '#1A1E1A',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#F2F4EF',
+    borderWidth: 1,
+    borderColor: '#292E29',
+  },
+  buscadorBoton: {
+    width: 46,
+    backgroundColor: '#B8F23D',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
